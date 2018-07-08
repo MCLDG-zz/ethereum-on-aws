@@ -21,6 +21,8 @@ Resources:
     Type: 'AWS::IAM::Role'
     Properties:
       RoleName: blockchainblog-ec2-role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
