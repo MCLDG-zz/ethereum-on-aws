@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda function that executes Ethereum transactions
+Outputs:
+  ExecuteTransactionsLambdaArn:
+    Description: ARN of the lambda that ExecuteTransactions
+    Value:
+      Fn::GetAtt:
+      - ExecuteTransactions
+      - Arn
+Parameters:
+  LambdaSecurityGroup:
+    Description: Security group for Lambda
+    Type: String
+  LambdaSubnetA:
+    Description: Subnet for Lambda
+    Type: String
+  LambdaSubnetB:
+    Description: Subnet for Lambda
+    Type: String
+Resources:
+  ExecuteTransactions:
+    Properties:
+      CodeUri: s3://mcdg-ethaaa-s3bucket/ExecuteTransactions/2342e50d150f6bad57c8708c999c9cf9
+      FunctionName: ExecuteTransactions
+      Handler: handler.handler
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+        - IamRoleLambdaExecution
+        - Arn
+      Runtime: nodejs8.10
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: LambdaSecurityGroup
+        SubnetIds:
+        - Ref: LambdaSubnetA
+        - Ref: LambdaSubnetB
+    Type: AWS::Serverless::Function
+  IamRoleLambdaExecution:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeInstances
+            - dynamodb:PutItem
+            - ec2:DescribeNetworkInterfaces
+            - dynamodb:GetItem
+            - ec2:DeleteNetworkInterface
+            Effect: Allow
+            Resource: '*'
+            Sid: stmt1
+          - Action:
+            - s3:GetObject
+            Effect: Allow
+            Resource:
+            - arn:aws:s3:::*/*
+            Sid: stmt2
+          Version: 2012-10-17
+        PolicyName: ExecuteTransactionsPolicy
+      RoleName: ExecuteTransactionsRole
+    Type: AWS::IAM::Role
+Transform: AWS::Serverless-2016-10-31

@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda function that listens for Ethereum transactions
+Outputs:
+  ListenForTransactionsLambdaArn:
+    Description: ARN of the lambda that ListenForTransactions
+    Value:
+      Fn::GetAtt:
+      - ListenForTransactions
+      - Arn
+Parameters:
+  LambdaSecurityGroup:
+    Description: Security group for Lambda
+    Type: String
+  LambdaSubnetA:
+    Description: Subnet for Lambda
+    Type: String
+  LambdaSubnetB:
+    Description: Subnet for Lambda
+    Type: String
+Resources:
+  IamRoleLambdaExecution:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeInstances
+            - dynamodb:PutItem
+            - ec2:DescribeNetworkInterfaces
+            - dynamodb:GetItem
+            - ec2:DeleteNetworkInterface
+            Effect: Allow
+            Resource: '*'
+            Sid: stmt1
+          - Action:
+            - s3:GetObject
+            Effect: Allow
+            Resource:
+            - arn:aws:s3:::*/*
+            Sid: stmt2
+          Version: 2012-10-17
+        PolicyName: ListenForTransactionsPolicy
+      RoleName: ListenForTransactionsRole
+    Type: AWS::IAM::Role
+  ListenForTransactions:
+    Properties:
+      CodeUri: s3://mcdg-ethaaa-s3bucket/ListenForTransactions/8baf331ef4e4aa800f9b9ff49a59b2bc
+      FunctionName: ListenForTransactions
+      Handler: handler.handler
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+        - IamRoleLambdaExecution
+        - Arn
+      Runtime: nodejs8.10
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: LambdaSecurityGroup
+        SubnetIds:
+        - Ref: LambdaSubnetA
+        - Ref: LambdaSubnetB
+    Type: AWS::Serverless::Function
+Transform: AWS::Serverless-2016-10-31

@@ -1,0 +1,393 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'VPC network for Ethereum'
+Parameters:
+  VPCCIDRBlock:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/16
+    Description: The VPC CIDR Block (eg 10.0.0.0/16)
+    Type: String
+  SubnetCIDR1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.2.0/24
+    Description: VPC CIDR Block for the Public Subnet (eg 10.0.0.0/24)
+    Type: String
+  SubnetCIDR2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.1.0/24
+    Description: VPC CIDR Block for the Private Subnet (eg 10.0.0.0/24)
+    Type: String
+Resources:
+  IamRoleEC2:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: blockchainblog-ec2-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: blockchainblog-ec2-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - 'ecs:CreateCluster,'
+                  - 'ecs:DeregisterContainerInstance,'
+                  - 'ecs:DiscoverPollEndpoint,'
+                  - 'ecs:Poll,'
+                  - 'ecs:RegisterContainerInstance,'
+                  - 'ecs:StartTelemetrySession,'
+                  - 'ecs:Submit,'
+                  - 'ecr:GetAuthorizationToken,'
+                  - 'ecr:BatchCheckLayerAvailability,'
+                  - 'ecr:GetDownloadUrlForLayer,'
+                  - 'ecr:BatchGetImage",'
+                  - 'logs:CreateLogStream,'
+                  - 'logs:PutLogEvents,'
+                  - 'dynamodb:BatchGetItem,'
+                  - 'dynamodb:BatchWriteItem,'
+                  - 'dynamodb:PutItem,'
+                  - 'dynamodb:DeleteItem,'
+                  - 'dynamodb:GetItem,'
+                  - 'dynamodb:Scan,'
+                  - 'dynamodb:Query,'
+                  - 'dynamodb:UpdateItem'
+                Resource: '*'
+  IamRoleEC2InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        -
+          Ref: "IamRoleEC2"
+  IamRoleECS:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: blockchainblog-ecs-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: blockchainblog-ecs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: VisualEditor0
+                Effect: Allow
+                Action:
+                  - 'ec2:AuthorizeSecurityGroupIngress,'
+                  - 'ec2:Describe*,'
+                  - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer,'
+                  - 'elasticloadbalancing:DeregisterTargets,'
+                  - 'elasticloadbalancing:Describe*,'
+                  - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer,'
+                  - 'elasticloadbalancing:RegisterTargets'
+                  - 'elasticloadbalancing:*'
+                Resource: '*'
+  blockchainblogvpc:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: {Ref: VPCCIDRBlock}
+      InstanceTenancy: default
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'false'
+      Tags:
+        - Key: Name
+          Value: blockchainblogvpc
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d86c200b-e2e0-4045-b667-0d6eb5646a9c
+  subnetPublic:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: {Ref: SubnetCIDR2}
+      AvailabilityZone:
+        !Join
+          - ''
+          - - !Sub ${AWS::Region}
+            - "a"
+      VpcId: !Ref blockchainblogvpc
+      Tags:
+        - Key: Name
+          Value: blockchainblog-public
+  subnetPrivate:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: {Ref: SubnetCIDR1}
+      AvailabilityZone:
+        !Join
+          - ''
+          - - !Sub ${AWS::Region}
+            - "b"
+      VpcId: !Ref blockchainblogvpc
+      Tags:
+        - Key: Name
+          Value: blockchainblog-private
+  blockchainblogigw:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: blockchainblog-igw
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 179d03c2-c276-4932-97ff-745b066209ea
+  dopt11658577:
+    Type: 'AWS::EC2::DHCPOptions'
+    Properties:
+      DomainName: ec2.internal
+      DomainNameServers:
+        - AmazonProvidedDNS
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3bb29799-c151-462f-9e1b-cf40bc8dac8e
+  blockchainblognacl:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6fade706-d83c-48a6-847b-d712ff5b8d10
+  blockchainblognrt:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+      Tags:
+        - Key: Name
+          Value: blockchainblog-private-route
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9631d1da-5de8-40ae-ba49-825f14381f4a
+  blockchainblognrtpublic:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+      Tags:
+        - Key: Name
+          Value: blockchainblog-public-route
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 42509113-bcb3-419f-a679-859a7b701ec5
+  rtb248e8659:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 20de2066-50f5-49f5-b7d8-b08c0f00dc8f
+  tableblockchainblog:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: blockchainblog
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: '5'
+        WriteCapacityUnits: '5'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 66982da4-8d14-4d68-a8a5-4324b8033a54
+  streamblockchainblog:
+    Type: 'AWS::Kinesis::Stream'
+    Properties:
+      Name: blockchainblog
+      ShardCount: '1'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 74f53e8f-afd0-4778-a61a-481c7253e12d
+  sgblockchainblogsecuritygroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: A security group for the Blockchain Blog post
+      VpcId: !Ref blockchainblogvpc
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 57c28f14-a668-49e4-800e-44774fbe4686
+  acl1:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref blockchainblognacl
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 485caf27-7ac3-4de7-b788-2e94d4ea66f0
+  acl2:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref blockchainblognacl
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 036daf94-e0b6-4059-a5b9-ec9ad6d0d5d4
+  subnetacl1:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref blockchainblognacl
+      SubnetId: !Ref subnetPublic
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c963abf2-d87a-4d71-8380-ae200820d843
+  subnetacl2:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      NetworkAclId: !Ref blockchainblognacl
+      SubnetId: !Ref subnetPrivate
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d5c49ff9-c863-47a8-b5d1-1be4f440b1d8
+  nat1:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 
+        - NatEip
+        - AllocationId
+      SubnetId: !Ref subnetPublic
+    DependsOn: subnetPublic
+  gw1:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+      InternetGatewayId: !Ref blockchainblogigw
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6cdb7e78-0b30-434a-bbf5-7e22ca06f2bb
+  subnetroute1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref blockchainblognrt
+      SubnetId: !Ref subnetPrivate
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 7bba8c89-be32-493a-9ffa-de31161ab933
+  subnetroute2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref blockchainblognrtpublic
+      SubnetId: !Ref subnetPublic
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 2dfdd82c-fa9c-42d0-b0e5-deafc1babd95
+  route1:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref blockchainblognrt
+      NatGatewayId: !Ref nat1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 48175224-0dfd-44b8-8fe2-bc00130bbd8b
+  NatEip:
+    Properties:
+      Domain: vpc
+    Type: 'AWS::EC2::EIP'
+  route2:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref blockchainblognrtpublic
+      GatewayId: !Ref blockchainblogigw
+    DependsOn: gw1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d1dc3f41-38aa-4039-b2df-bb00255fae54
+  route3:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref rtb248e8659
+      GatewayId: !Ref blockchainblogigw
+    DependsOn: gw1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 413c4cf4-fdc4-4209-a7c7-c7f44af98755
+  dchpassoc1:
+    Type: 'AWS::EC2::VPCDHCPOptionsAssociation'
+    Properties:
+      VpcId: !Ref blockchainblogvpc
+      DhcpOptionsId: !Ref dopt11658577
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a232c764-d211-4afd-a446-7a6c30533bc2
+  ingress1:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgblockchainblogsecuritygroup
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+      CidrIp: 0.0.0.0/0
+  ingress2:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgblockchainblogsecuritygroup
+      IpProtocol: tcp
+      FromPort: '8546'
+      ToPort: '8546'
+      CidrIp: 0.0.0.0/0
+  ingress3:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgblockchainblogsecuritygroup
+      IpProtocol: tcp
+      FromPort: '8545'
+      ToPort: '8545'
+      CidrIp: 0.0.0.0/0
+  egress1:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !Ref sgblockchainblogsecuritygroup
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+Outputs:
+  VPCID:
+    Description: "VPC ID"
+    Value: !Ref blockchainblogvpc
+  SecurityGroup:
+    Description: "Security Group"
+    Value: !Ref sgblockchainblogsecuritygroup
+  SubnetPublic:
+    Description: "SubnetPublic"
+    Value: !Ref subnetPublic
+  SubnetPrivate:
+    Description: "SubnetPrivate"
+    Value: !Ref subnetPrivate
+  Subnets:
+    Description: "Subnets"
+    Value:
+      !Join
+        - ','
+        - - !Ref subnetPublic
+          - !Ref subnetPrivate
+  IamRoleECS:
+    Description: "IamRoleECS"
+    Value: !Ref IamRoleECS
+  IamRoleEC2:
+    Description: "IamRoleEC2"
+    Value: !GetAtt IamRoleEC2.Arn
+  IamRoleEC2InstanceProfile:
+    Description: "IamRoleEC2InstanceProfile"
+    Value: !GetAtt IamRoleEC2InstanceProfile.Arn

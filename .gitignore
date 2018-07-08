@@ -1,0 +1,4 @@
+.idea
+node_modules
+s3-bucket-policy.json
+s3-bucket-policy.json-e
